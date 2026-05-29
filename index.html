@@ -187,14 +187,14 @@
 
         function updateButtons() {
             extractBtn.disabled = files.length === 0;
-            document.getElementById('generateBtn').disabled = incompleteRecords.length === 0;
-            document.getElementById('assignBtn').disabled = incompleteRecords.length === 0;
+            document.getElementById('generateBtn').disabled = false;
+            document.getElementById('assignBtn').disabled = false;
             document.getElementById('downloadCleanBtn').disabled = false; // Siempre habilitado
             document.getElementById('downloadFullBtn').disabled = false; // Siempre habilitado
             document.getElementById('downloadDupBtn').disabled = false; // Siempre habilitado
-            document.getElementById('sendCleanTgBtn').disabled = uniqueData.length === 0;
-            document.getElementById('sendFullTgBtn').disabled = fullData.length === 0;
-            document.getElementById('sendDupTgBtn').disabled = duplicateData.length === 0;
+            document.getElementById('sendCleanTgBtn').disabled = false;
+            document.getElementById('sendFullTgBtn').disabled = false;
+            document.getElementById('sendDupTgBtn').disabled = false;
             document.getElementById('incompleteCountInfo').textContent = incompleteRecords.length;
         }
 
